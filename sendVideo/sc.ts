@@ -1,6 +1,3 @@
-// 3. Actualización de sendVideo/sc.ts
-// Este archivo contiene la lógica de búsqueda
-
 import { Media, Post, Video, getData } from "./utils";
 
 export const search = async function (subredditName?: string): Promise<Video[]> {
@@ -49,6 +46,7 @@ function getAllPostFromSubreddits(data: any): Post[] {
 function getPostsFromSpecificSubreddit(data: any): Post[] {
   if (!data.data || !data.data.subreddit || !data.data.subreddit.children || !data.data.subreddit.children.items) {
     console.log("No se encontraron posts en el subreddit especificado");
+    console.log("Respuesta de la API:", JSON.stringify(data, null, 2));
     return [];
   }
   
