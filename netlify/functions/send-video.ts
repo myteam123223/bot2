@@ -1,6 +1,3 @@
-// 5. Actualización de netlify/functions/send-video.ts
-// Este archivo contiene el manejador de función programada de Netlify
-
 import { schedule } from "@netlify/functions";
 import { sendVideos } from "../../sendVideo/index";
 import { N_VIDEOS, SUBREDDIT } from "../../sendVideo/myConfig";
