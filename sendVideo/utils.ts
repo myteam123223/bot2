@@ -1,6 +1,3 @@
-// 2. Actualización de sendVideo/utils.ts
-// Este archivo contiene las utilidades y la consulta GraphQL
-
 import fetch from "node-fetch";
 
 // Interfaz para la configuración de Scrolller
@@ -81,21 +78,26 @@ query SubredditQuery($url: String! $filter: MediaFilter $limit: Int $iterator: S
 `;
 
 export async function getData(subredditName?: string): Promise<any> {
-  // Crea variables para la solicitud
+  // Crea el cuerpo de la solicitud
   let query = qrDiscoverSubreddits;
-  let requestVariables = variables;
+  let rqBody;
   
   // Si se proporciona un subreddit, ajusta la consulta y las variables
   if (subredditName) {
     query = qrSpecificSubreddit;
-    requestVariables = {
-      ...variables,
-      url: `/r/${subredditName}`
+    rqBody = { 
+      query, 
+      variables: {
+        url: `/r/${subredditName}`,
+        filter: "VIDEO",
+        limit: 10,
+        iterator: null
+      }
     };
+  } else {
+    // Crea el cuerpo de la solicitud para la consulta original
+    rqBody = { query, variables };
   }
-
-  // Crea el cuerpo de la solicitud
-  const rqBody = { query, variables: requestVariables };
   
   // Realiza la solicitud
   const response = await fetch("https://api.scrolller.com/api/v2/graphql", {
