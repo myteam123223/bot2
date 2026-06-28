@@ -1,130 +1,60 @@
-import fetch from "node-fetch";
+import fetch from "node-fetch"
 
-// Interfaz para la configuración de Scrolller
-export interface ScrolllerConfig {
-  hostsDown: null;
-  filter: string;
-  limit: number;
-}
+const SCROLLLER_ENDPOINT = "https://api.scrolller.com/admin"
 
-const variables = {
-  hostsDown: null,
-  filter: "VIDEO",
-  limit: 10,
-};
+// Query actual de Scrolller (la misma que usa su web)
+const qrDiscover = `
+ query DiscoverFilteredSubredditsQuery( $filter: GalleryFilter $sortBy: GallerySortBy $limit: Int! $childLimit: Int! $iterator: String $includeFilters: [Int!] $excludeFilters: [Int!] $isNsfw: Boolean! ) { discoverFilteredSubreddits( data: { isNsfw: $isNsfw filter: $filter limit: $limit childLimit: $childLimit iterator: $iterator includeFilters: $includeFilters excludeFilters: $excludeFilters sortBy: $sortBy } ) { iterator items { __typename id url title isNsfw children { iterator items { __typename id url title redditPath isNsfw hasAudio duration mediaSources { url width height isOptimized type } } } } } } 
+`
 
-// Consulta original para descubrir subreddits aleatorios (se mantiene para compatibilidad)
-const qrDiscoverSubreddits = `
-query DiscoverSubredditsQuery( $filter: MediaFilter $limit: Int $iterator: String ) { discoverSubreddits( isNsfw: true filter: $filter limit: $limit iterator: $iterator ) { iterator items { __typename id url title secondaryTitle description createdAt isNsfw subscribers isComplete itemCount videoCount pictureCount albumCount isPaid username tags banner { url width height isOptimized } isFollowing children( limit: 2 iterator: null filter: SOUND disabledHosts: null homePage: true ) { iterator items { __typename id url title subredditId subredditTitle subredditUrl redditPath isNsfw albumUrl hasAudio fullLengthSource gfycatSource redgifsSource ownerAvatar username displayName isPaid tags isFavorite mediaSources { url width height isOptimized } blurredMediaSources { url width height isOptimized } } } } } } 
-`;
-
-// Nueva consulta para un subreddit específico
-const qrSpecificSubreddit = `
-query SubredditQuery($url: String! $filter: MediaFilter $limit: Int $iterator: String) {
-  subreddit(url: $url) {
-    id
-    url
-    title
-    secondaryTitle
-    description
-    createdAt
-    isNsfw
-    subscribers
-    isComplete
-    itemCount
-    videoCount
-    pictureCount
-    albumCount
-    isPaid
-    children(limit: $limit iterator: $iterator filter: $filter disabledHosts: null homePage: true) {
-      iterator
-      items {
-        __typename
-        id
-        url
-        title
-        subredditId
-        subredditTitle
-        subredditUrl
-        redditPath
-        isNsfw
-        albumUrl
-        hasAudio
-        fullLengthSource
-        gfycatSource
-        redgifsSource
-        ownerAvatar
-        username
-        displayName
-        isPaid
-        tags
-        isFavorite
-        mediaSources {
-          url
-          width
-          height
-          isOptimized
-        }
-        blurredMediaSources {
-          url
-          width
-          height
-          isOptimized
-        }
-      }
-    }
+export async function getData(_subredditName?: string): Promise<any> {
+  const variables = {
+    filter: "VIDEO",      // solo vídeos
+    sortBy: "RANDOM",
+    limit: 20,            // nº de subreddits que descubre
+    childLimit: 5,        // nº de posts por subreddit
+    iterator: null,
+    includeFilters: [],
+    excludeFilters: [],
+    isNsfw: true,         // <-- contenido adulto
   }
-}
-`;
 
-export async function getData(subredditName?: string): Promise<any> {
-  // Crea el cuerpo de la solicitud
-  let query = qrDiscoverSubreddits;
-  let rqBody;
-  
-  // Si se proporciona un subreddit, ajusta la consulta y las variables
-  if (subredditName) {
-    query = qrSpecificSubreddit;
-    rqBody = { 
-      query, 
-      variables: {
-        url: `/r/${subredditName}`,
-        filter: "VIDEO",
-        limit: 10,
-        iterator: null
-      }
-    };
-  } else {
-    // Crea el cuerpo de la solicitud para la consulta original
-    rqBody = { query, variables };
-  }
-  
-  // Realiza la solicitud
-  const response = await fetch("https://api.scrolller.com/api/v2/graphql", {
+  const response = await fetch(SCROLLLER_ENDPOINT, {
     method: "post",
     headers: {
       "Content-Type": "application/json",
+      // Headers de navegador para no comernos un bloqueo de Cloudflare desde Netlify
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      Origin: "https://scrolller.com",
+      Referer: "https://scrolller.com/",
     },
-    body: JSON.stringify(rqBody),
-  });
-  
-  console.log(response);
-  const data = await response.json();
-  console.log(data);
-  return data;
-}
+    body: JSON.stringify({ query: qrDiscover, variables }),
+  })
 
-export interface Post {
-  title: string;
-  mediaSources: Media[];
-}
-
-export interface Video {
-  playUrl: string;
-  cover: string;
-  caption: string;
+  if (!response.ok) {
+    console.log(`Scrolller -> ${response.status} ${response.statusText}`)
+  }
+  const data = await response.json()
+  if ((data as any)?.errors) console.log("GraphQL errors:", JSON.stringify((data as any).errors))
+  return data
 }
 
 export interface Media {
-  url: string;
+  url: string
+  width: number
+  height: number
+  isOptimized: boolean
+  type: string // "MP4" | "JPEG" | "WEBP"...
+}
+
+export interface Post {
+  title: string
+  mediaSources: Media[]
+}
+
+export interface Video {
+  playUrl: string
+  cover: string
+  caption: string
 }
