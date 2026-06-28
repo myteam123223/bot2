@@ -13,17 +13,13 @@ export const search = async function (_subredditName?: string): Promise<Video[]>
 }
 
 function getAllPostFromSubreddits(data: any): Post[] {
-  const root = data?.data?.discoverFilteredSubreddits
-  if (!root || !Array.isArray(root.items)) {
-    console.log("No se encontraron subreddits:", JSON.stringify(data)?.slice(0, 300))
+  const items = data?.data?.getSubredditChildren?.items
+  if (!Array.isArray(items)) {
+    console.log("Sin posts en el subreddit:", JSON.stringify(data)?.slice(0, 300))
     return []
   }
-  const subreddits = root.items
-  console.log(`Subreddits -> Total: ${subreddits.length}`)
-
-  const allPost: Post[] = subreddits.flatMap((sr: any) => sr?.children?.items ?? [])
-  console.log(`Posts -> Total: ${allPost.length}`)
-  return allPost
+  console.log(`Posts en el subreddit -> ${items.length}`)
+  return items
 }
 
 function getVideos(posts: Post[]): Video[] {
@@ -39,11 +35,12 @@ function getVideos(posts: Post[]): Video[] {
 function getVideo(post: any): Video {
   const sources: Media[] = post?.mediaSources ?? []
 
-  // mejor MP4 (mayor resolución)
+  // Mejor MP4 disponible (mayor anchura)
   const mp4 = sources
     .filter((m) => m?.type === "MP4" || (m?.url ?? "").includes(".mp4"))
     .sort((a, b) => (b?.width ?? 0) - (a?.width ?? 0))[0]
 
+  // Portada (primer JPEG)
   const cover = sources.find((m) => m?.type === "JPEG" || (m?.url ?? "").includes(".jpg"))
 
   return {
