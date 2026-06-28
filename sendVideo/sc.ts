@@ -1,109 +1,54 @@
-import { Media, Post, Video, getData } from "./utils";
+import { Media, Post, Video, getData } from "./utils"
 
-export const search = async function (subredditName?: string): Promise<Video[]> {
+export const search = async function (_subredditName?: string): Promise<Video[]> {
   try {
-    const response = await getData(subredditName);
-    let posts: Post[];
-    
-    if (subredditName) {
-      // Extrae los posts cuando se especifica un subreddit
-      posts = getPostsFromSpecificSubreddit(response);
-    } else {
-      // Usa la función existente para todos los subreddits
-      posts = getAllPostFromSubreddits(response);
-    }
-    
-    const videos: Video[] = getVideos(posts);
-    return videos;
+    const response = await getData()
+    const posts: Post[] = getAllPostFromSubreddits(response)
+    const videos: Video[] = getVideos(posts)
+    return videos
   } catch (error) {
-    console.log(`Error Search`, error);
-    return [];
+    console.log(`Error Search`, error)
+    return []
   }
-};
+}
 
-// Función original para extraer posts de múltiples subreddits
 function getAllPostFromSubreddits(data: any): Post[] {
-  if (!data.data || !data.data.discoverSubreddits || !data.data.discoverSubreddits.items) {
-    console.log("No se encontraron subreddits");
-    return [];
+  const root = data?.data?.discoverFilteredSubreddits
+  if (!root || !Array.isArray(root.items)) {
+    console.log("No se encontraron subreddits:", JSON.stringify(data)?.slice(0, 300))
+    return []
   }
-  
-  const subreddits = data.data.discoverSubreddits.items;
+  const subreddits = root.items
+  console.log(`Subreddits -> Total: ${subreddits.length}`)
 
-  console.log(
-    `Subreddits get -> Name:${Object.keys(subreddits)} - Total:${
-      Object.keys(subreddits).length
-    } `
-  );
-  const allPost: Post[] = Object.values(subreddits).flatMap(
-    (obj: any) => obj.children.items
-  );
-  console.log(`Post get -> Total:${allPost.length}`);
-  return allPost;
+  const allPost: Post[] = subreddits.flatMap((sr: any) => sr?.children?.items ?? [])
+  console.log(`Posts -> Total: ${allPost.length}`)
+  return allPost
 }
 
-// Nueva función para extraer posts de un subreddit específico
-function getPostsFromSpecificSubreddit(data: any): Post[] {
-  if (!data.data || !data.data.subreddit || !data.data.subreddit.children || !data.data.subreddit.children.items) {
-    console.log("No se encontraron posts en el subreddit especificado");
-    console.log("Respuesta de la API:", JSON.stringify(data, null, 2));
-    return [];
+function getVideos(posts: Post[]): Video[] {
+  const listVids: Video[] = []
+  for (const post of posts) {
+    const v = getVideo(post)
+    if (v.playUrl !== "") listVids.push(v)
   }
-  
-  const items = data.data.subreddit.children.items;
-  console.log(`Posts encontrados en el subreddit específico: ${items.length}`);
-  return items;
+  console.log(`Vídeos válidos -> ${listVids.length}`)
+  return listVids.sort(() => Math.random() - 0.5)
 }
 
-function getVideos(posts: Post[]) {
-  let listVids: Video[] = [];
-  for (let i = 0; i < posts.length; i++) {
-    const post = posts[i];
-    const video = getVideo(post);
-    if (video.playUrl != "") {
-      listVids.push(video);
-    }
+function getVideo(post: any): Video {
+  const sources: Media[] = post?.mediaSources ?? []
+
+  // mejor MP4 (mayor resolución)
+  const mp4 = sources
+    .filter((m) => m?.type === "MP4" || (m?.url ?? "").includes(".mp4"))
+    .sort((a, b) => (b?.width ?? 0) - (a?.width ?? 0))[0]
+
+  const cover = sources.find((m) => m?.type === "JPEG" || (m?.url ?? "").includes(".jpg"))
+
+  return {
+    playUrl: mp4 ? mp4.url : "",
+    cover: cover ? cover.url : "",
+    caption: post?.title ?? "",
   }
-
-  let rdListVids = listVids.sort((a, b) => Math.random() - 0.5);
-  return rdListVids;
-}
-
-function getVideo(post: Post): Video {
-  let videoTitle = post.title;
-  let videoUrl = "";
-  let videoCover = "";
-
-  if (post.mediaSources != null) {
-    for (let k = 0; k < post.mediaSources.length; k++) {
-      const media: Media = post.mediaSources[k];
-
-      if (media.url.includes(".scrolller.com/")) {
-        if (media.url.includes(".mp4")) {
-          videoUrl = media.url;
-        }
-
-        if (media.url.includes(".jpg")) {
-          videoCover = media.url;
-        }
-      } else {
-        if (media.url.includes(".mp4")) {
-          let pathId = media.url.split("/").pop();
-          videoUrl = `https://static.scrolller.com/proton/${pathId}`;
-          videoCover = `https://static.scrolller.com/proton/${pathId!.replace(
-            ".mp4",
-            ".jpg"
-          )}`;
-          break;
-        }
-      }
-    }
-  }
-
-  let newVideo: Video = {
-    playUrl: videoUrl,
-    cover: videoCover,
-    caption: videoTitle,
-  };
-  return newVideo;
 }
